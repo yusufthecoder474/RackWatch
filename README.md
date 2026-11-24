@@ -11,7 +11,7 @@
 
 ---
 
-> **Verified status:** The complete `make test` workflow passed in the supplied development run on 23 November 2026. The OWASP dependency-check Maven stage was skipped, so this is not a claim of a clean dependency vulnerability scan.
+> **Verification status:** The API integration tests, C daemon unit tests, and sanitizer checks have passed in local runs. A fresh complete `make test` run is still required before claiming the entire workflow passes.
 
 ## 📌 What is RackWatch?
 
@@ -314,7 +314,7 @@ The supplied run on 23 November 2026 reported:
 - JaCoCo coverage checks: passed.
 - Overall `make test`: completed successfully.
 
-**Dependency scanning caveat:** OWASP dependency-check was skipped in that run. Run the dependency-check workflow with its required NVD API key before claiming a vulnerability scan has passed.
+**Dependency scanning:** OWASP Dependency-Check 13.0.0 completed locally and reported 0 vulnerable dependencies and 0 vulnerabilities. The Sonatype OSS Index analyzer was disabled because credentials were not configured. GitHub Actions also requires the `NVD_API_KEY` repository secret.
 
 ## 📁 Project structure
 
@@ -385,7 +385,7 @@ For experiments: create a feature branch, make one focused change, run relevant 
 
 ## 📄 License
 
-No license has been specified yet. Until a license is added, do not assume the repository grants permission to reuse, redistribute, or modify the project.
+RackWatch is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ---
 

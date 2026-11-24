@@ -26,9 +26,13 @@ jobs:
           cache: maven
 
       - name: Check the NVD API key is configured
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
-          test -n "${{ secrets.NVD_API_KEY }}" \
-            || (echo "NVD_API_KEY secret is not set — add it in the repository settings (Settings > Secrets and variables > Actions)." ; exit 1)
+          test -n "$NVD_API_KEY" || {
+            echo "NVD_API_KEY secret is not configured."
+            exit 1
+          }
 
       - name: Cache the NVD vulnerability database
         uses: actions/cache@v4
@@ -41,4 +45,4 @@ jobs:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
           mvn -f api/pom.xml org.owasp:dependency-check-maven:13.0.0:check \
-            -DnvdApiKey="$NVD_API_KEY" -DfailBuildOnCVSS=7
+            -DnvdApiKey="$NVD_API_KEY" -Dowasp.skip=false -DfailBuildOnCVSS=7

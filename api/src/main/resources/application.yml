@@ -51,7 +51,6 @@ spring:
     # every field.
     property-naming-strategy: SNAKE_CASE
     serialization:
-      write-dates-as-timestamps: false
   servlet:
     multipart:
       # Uploads are not part of this API; keep the multipart ceiling low.

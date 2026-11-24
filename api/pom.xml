@@ -19,7 +19,7 @@
   <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
-    <version>3.4.1</version>
+    <version>4.2.0</version>
     <relativePath/>
   </parent>
 
@@ -32,11 +32,11 @@
 
   <properties>
     <java.version>21</java.version>
-    <springdoc.version>2.7.0</springdoc.version>
-    <poi.version>5.3.0</poi.version>
+    <springdoc.version>3.2.1</springdoc.version>
+    <poi.version>5.5.1</poi.version>
     <testcontainers.version>1.21.4</testcontainers.version>
     <jacoco.version>0.8.12</jacoco.version>
-    <owasp-dc.version>11.1.0</owasp-dc.version>
+    <owasp-dc.version>13.0.0</owasp-dc.version>
     <!-- Skip OWASP scan locally; CI sets -Dowasp.skip=false -->
     <owasp.skip>true</owasp.skip>
   </properties>
@@ -75,15 +75,13 @@
     </dependency>
 
     <dependency>
-      <groupId>org.flywaydb</groupId>
-      <artifactId>flyway-core</artifactId>
-      <!-- version managed by Spring Boot BOM -->
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-flyway</artifactId>
     </dependency>
 
     <dependency>
       <groupId>org.flywaydb</groupId>
       <artifactId>flyway-database-postgresql</artifactId>
-      <!-- Required for Flyway 10+ PostgreSQL support -->
     </dependency>
 
     <!-- ── OpenAPI / Swagger ──────────────────────────────────────────────  -->
@@ -113,7 +111,12 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
-      <!-- Includes JUnit 5, Mockito, AssertJ, MockMvc, Spring Test -->
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webmvc-test</artifactId>
+      <scope>test</scope>
     </dependency>
 
     <dependency>
@@ -202,7 +205,6 @@
         <configuration>
           <skip>${owasp.skip}</skip>
           <failBuildOnCVSS>7</failBuildOnCVSS>
-          <suppressionFile>owasp-suppressions.xml</suppressionFile>
           <nvdApiKey>${env.NVD_API_KEY}</nvdApiKey>
         </configuration>
         <executions>

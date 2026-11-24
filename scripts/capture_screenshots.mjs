@@ -44,7 +44,7 @@ try {
   if (!health.ok()) throw new Error(`Health check failed: HTTP ${health.status()}`);
   await page.goto(`${base}/`, { waitUntil: 'networkidle', timeout: 30000 });
   await page.locator('#key-form').waitFor({ state: 'visible', timeout: 15000 });
-  await shot('01-api-key-entry.png', page.locator('#key-form'));
+  await shot('01-api-key-entry.png', null, true);
   await page.locator('#api-key-input').fill(key);
   await page.locator('#key-form').locator('button[type="submit"], input[type="submit"]').first().click();
   await page.locator('#rooms-section').waitFor({ state: 'visible', timeout: 15000 });
@@ -52,17 +52,23 @@ try {
   await shot('02-dashboard-full.png', null, true);
   await shot('03-rooms-overview.png', page.locator('#rooms-section'));
   const cards = page.locator('#rooms .room-card');
-  if (await cards.count()) await shot('04-room-a-details.png', cards.nth(0));
-  else await shot('04-room-a-details.png', page.locator('#rooms-section'));
-  if (await cards.count() > 1) await shot('05-room-b-details.png', cards.nth(1));
-  else await shot('05-room-b-details.png', page.locator('#rooms-section'));
-  await shot('06-open-alerts.png', page.locator('#alerts-section'));
+  if (await cards.count() > 0) {
+    await shot('04-room-a-details.png', cards.nth(0));
+  } else {
+    await shot('04-room-a-details.png', page.locator('#rooms-section'));
+  }
+  if (await cards.count() > 1) {
+    await shot('05-room-b-details.png', cards.nth(1));
+  } else {
+    await shot('05-room-b-details.png', page.locator('#rooms-section'));
+  }
+  await shot('06-open-alerts.png', null, true);
   const alert = page.locator('#alerts .alert-row').first();
   if (await alert.count()) {
     const name = alert.locator('input[type="text"]');
     if (await name.count()) await name.fill('Demo Reviewer');
-    await shot('07-alert-acknowledgement.png', alert);
-  } else await shot('07-alert-acknowledgement.png', page.locator('#alerts-section'));
+    await shot('07-alert-acknowledgement.png', null, true);
+  } else await shot('07-alert-acknowledgement.png', null, true);
 
   const selector = page.locator('#sensor-select');
   const getOptions = async () => selector.locator('option').evaluateAll(els => els.map(e => ({ value: e.value, text: e.textContent || '' })));
