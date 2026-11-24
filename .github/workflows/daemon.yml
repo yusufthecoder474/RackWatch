@@ -1,0 +1,35 @@
+name: Daemon
+
+# C daemon: build, unit tests, sanitizers, smoke test, cppcheck.
+on:
+  push:
+  pull_request:
+
+jobs:
+  daemon:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc make pkg-config libcurl4-openssl-dev cppcheck python3
+
+      - name: Build
+        run: make -C daemon all
+
+      - name: Unit tests
+        run: make -C daemon test
+
+      - name: Sanitizer tests (AddressSanitizer + UBSan)
+        run: make -C daemon test-asan
+
+      - name: Integration smoke test
+        run: make -C daemon test-integration
+
+      - name: cppcheck
+        run: |
+          cppcheck --enable=warning,performance,portability --std=c11 \
+            --error-exitcode=1 --suppress=missingIncludeSystem \
+            --inline-suppr daemon/

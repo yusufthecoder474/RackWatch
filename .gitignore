@@ -1,0 +1,39 @@
+# Secrets and environment files
+.env
+.env.*
+!.env.example
+
+# Node.js
+node_modules/
+npm-debug.log*
+.npm/
+
+# Java / Maven
+**/target/
+*.class
+
+# C build outputs
+*.o
+daemon/rackwatchd
+daemon/test_rackwatchd
+
+# Test and coverage outputs
+coverage/
+*.gcda
+*.gcno
+*.gcov
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
+*~
+
+# Operating system files
+.DS_Store
+Thumbs.db
+*.Zone.Identifier
+
+# IDE settings
+.idea/
+.vscode/

@@ -1,0 +1,40 @@
+# RackWatch daemon — systemd unit.
+#
+# Install with `make install` (or copy to /lib/systemd/system/), then:
+#   useradd --system --no-create-home --home-dir /var/lib/rackwatchd rackwatch
+#   install -d -o rackwatch -g rackwatch -m 750 /etc/rackwatchd
+#   printf 'RACKWATCH_API_KEY=<key>\n' > /etc/rackwatchd/env
+#   chmod 600 /etc/rackwatchd/env && chown rackwatch:rackwatch /etc/rackwatchd/env
+#   systemctl daemon-reload && systemctl enable --now rackwatchd
+#
+# The key file must be mode 600 owned by the rackwatch user: systemd
+# reads it as root and passes it in the environment, so no other user
+# on the box can read it. There is deliberately no After= on the API
+# service: the daemon buffers while the API is down, so it does not
+# need the API to be up first.
+[Unit]
+Description=RackWatch environment monitor daemon
+Documentation=file:///usr/share/doc/rackwatch/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=rackwatch
+Group=rackwatch
+EnvironmentFile=-/etc/rackwatchd/env
+ExecStart=/usr/local/bin/rackwatchd --config /etc/rackwatchd/sensors.conf --url http://localhost:8080 --buffer /var/lib/rackwatchd/buffer.jsonl --quarantine /var/lib/rackwatchd/quarantine.jsonl --foreground
+Restart=on-failure
+RestartSec=5
+# StateDirectory creates /var/lib/rackwatchd owned by the service user,
+# which is where the buffer and quarantine files live.
+StateDirectory=rackwatchd
+# Hardening: the daemon only needs to write its state directory and
+# read its config; it never needs the rest of the filesystem.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

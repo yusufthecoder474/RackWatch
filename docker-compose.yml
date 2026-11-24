@@ -1,0 +1,115 @@
+# RackWatch — local stack: PostgreSQL 16 + Spring Boot API + rackwatchd daemon.
+# Run with:  make up        (after Part 6, when the API Dockerfile exists;
+#                            the daemon Dockerfile already exists, Part 4)
+# Stop with: make down
+#
+# Secrets are REQUIRED — there are no defaults for them anywhere in this
+# file. Before running compose, set them in your shell or in a .env file
+# next to this file (compose reads .env automatically; do not commit it):
+#   POSTGRES_PASSWORD=<a strong password>
+#   RACKWATCH_API_KEY=<a long random key, e.g. from: openssl rand -hex 32>
+# If either is unset or empty, compose fails immediately with the
+# message after the :? instead of starting with a guessed secret.
+
+name: rackwatch
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: rackwatch-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rackwatch}
+      POSTGRES_USER: ${POSTGRES_USER:-rackwatch}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required - set it in your shell or .env before running docker compose}
+    ports:
+      # Bound to localhost only: the database is never exposed on the
+      # machine's external interfaces. The API reaches it over the
+      # internal compose network (host "postgres"), not via this port.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-rackwatch} -d $${POSTGRES_DB:-rackwatch}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    image: rackwatch-api:local
+    container_name: rackwatch-api
+    # The API runs as a non-root user inside its image (USER 10001, set in
+    # the Dockerfile in Part 6); nothing here runs as root.
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-rackwatch}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-rackwatch}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required - set it in your shell or .env before running docker compose}
+      RACKWATCH_API_KEY: ${RACKWATCH_API_KEY:?RACKWATCH_API_KEY is required - set it in your shell or .env before running docker compose}
+      # The API container runs on UTC (also set in the Dockerfile, so
+      # the image is UTC even outside compose). Log timestamps and the
+      # Excel report's "Timestamp (UTC)" column are UTC because of it;
+      # the dashboard shows times in the browser's local zone instead.
+      TZ: UTC
+    ports:
+      # Bound to localhost only, like Postgres: the API (and the
+      # dashboard it serves) is reachable from this machine, not from
+      # the network. The daemon reaches it over the internal compose
+      # network (host "api"), not via this port.
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # BusyBox wget is present in the Alpine JRE base image; curl is not
+      # installed there, so the healthcheck uses wget (see Part 6 Dockerfile).
+      # It calls /actuator/health with no API key, which is why that one
+      # endpoint is public (see application.yml, rackwatch.security).
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+  rackwatchd:
+    build:
+      context: ./daemon
+      dockerfile: Dockerfile
+    image: rackwatchd:local
+    container_name: rackwatchd
+    # The daemon takes its settings from its command line, not from the
+    # environment (the API key is the one exception: it comes only from
+    # RACKWATCH_API_KEY, never from a file or a flag). There are no
+    # RACKWATCH_API_URL / RACKWATCH_CONFIG variables: the daemon reads
+    # neither, so setting them here would silently do nothing.
+    command: ["--config", "/etc/rackwatchd/sensors.conf",
+              "--url", "http://api:8080", "--foreground"]
+    environment:
+      RACKWATCH_API_KEY: ${RACKWATCH_API_KEY:?RACKWATCH_API_KEY is required - set it in your shell or .env before running docker compose}
+    volumes:
+      # The daemon's real paths: config in /etc/rackwatchd, buffer and
+      # quarantine in /var/lib/rackwatchd (see daemon/config.h).
+      - ./daemon/sensors.conf:/etc/rackwatchd/sensors.conf:ro
+      # Named volume, not a host path: Docker initialises a fresh named
+      # volume from the image directory, which the Dockerfile creates
+      # owned by the rackwatch user — so the non-root daemon can write
+      # it. A host bind-mount would need the same ownership set by hand.
+      - daemon-buffer:/var/lib/rackwatchd
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      # The daemon Dockerfile (Part 4) installs procps so pgrep exists.
+      test: ["CMD", "pgrep", "rackwatchd"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  daemon-buffer:

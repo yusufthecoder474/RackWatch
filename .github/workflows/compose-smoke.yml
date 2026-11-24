@@ -1,0 +1,55 @@
+name: Compose smoke test
+
+# End-to-end smoke test of the whole stack: generate secrets, bring
+# the stack up, wait for the API to be healthy, post the daemon's
+# golden batch, read the rooms back, then tear everything down.
+# The teardown runs even when an earlier step fails (if: always).
+on:
+  push:
+  pull_request:
+
+jobs:
+  compose-smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate .env with random secrets
+        run: |
+          printf 'POSTGRES_PASSWORD=%s\nRACKWATCH_API_KEY=%s\n' \
+            "$(openssl rand -hex 16)" "$(openssl rand -hex 32)" > .env
+
+      - name: Start the stack
+        run: docker compose up -d --build
+
+      - name: Wait for the API to be healthy
+        run: |
+          for i in $(seq 1 24); do
+            if curl -fsS http://localhost:8080/actuator/health >/dev/null 2>&1; then
+              echo "API healthy after $((i * 5)) s"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "API did not become healthy"
+          docker compose ps
+          docker compose logs api
+          exit 1
+
+      - name: Post the daemon's golden batch
+        run: |
+          source .env
+          curl -fsS -X POST http://localhost:8080/api/v1/readings \
+            -H "X-API-Key: $RACKWATCH_API_KEY" \
+            -H "Content-Type: application/json" \
+            --data @daemon/test/golden_batch.json
+
+      - name: Read the rooms back
+        run: |
+          source .env
+          curl -fsS http://localhost:8080/api/v1/rooms \
+            -H "X-API-Key: $RACKWATCH_API_KEY" | grep -q ROOM-A
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

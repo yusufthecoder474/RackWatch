@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  pom.xml — RackWatch API
+  Java 21 + Spring Boot 3.4.1 (latest stable as of 2025-Q4).
+  Design choices:
+    • Spring Boot parent BOM manages most version alignment automatically.
+    • springdoc-openapi 2.x is required for Spring Boot 3 (v1.x is Boot 2 only).
+    • Apache POI 5.3.0 for Excel generation (XSSF = .xlsx format).
+    • Testcontainers 1.20.x for PostgreSQL integration tests.
+    • JaCoCo plugin wired to the verify phase; build fails below 80% line coverage.
+    • OWASP Dependency-Check plugin runs in CI (see ci.yml); skipped locally by default.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.4.1</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>com.rackwatch</groupId>
+  <artifactId>rackwatch-api</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+  <name>rackwatch-api</name>
+  <description>RackWatch — data-centre environment monitoring API</description>
+
+  <properties>
+    <java.version>21</java.version>
+    <springdoc.version>2.7.0</springdoc.version>
+    <poi.version>5.3.0</poi.version>
+    <testcontainers.version>1.21.4</testcontainers.version>
+    <jacoco.version>0.8.12</jacoco.version>
+    <owasp-dc.version>11.1.0</owasp-dc.version>
+    <!-- Skip OWASP scan locally; CI sets -Dowasp.skip=false -->
+    <owasp.skip>true</owasp.skip>
+  </properties>
+
+  <dependencies>
+
+    <!-- ── Spring Boot starters ─────────────────────────────────────────── -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+      <!-- Provides @Valid, @NotNull, @DecimalMin, etc. via Hibernate Validator -->
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+      <!-- Exposes /actuator/health for Docker healthcheck -->
+    </dependency>
+
+    <!-- ── Database ──────────────────────────────────────────────────────── -->
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+      <!-- version managed by Spring Boot BOM (42.7.x) -->
+    </dependency>
+
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-core</artifactId>
+      <!-- version managed by Spring Boot BOM -->
+    </dependency>
+
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-database-postgresql</artifactId>
+      <!-- Required for Flyway 10+ PostgreSQL support -->
+    </dependency>
+
+    <!-- ── OpenAPI / Swagger ──────────────────────────────────────────────  -->
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+      <version>${springdoc.version}</version>
+    </dependency>
+
+    <!-- ── Apache POI for Excel reports ─────────────────────────────────── -->
+    <dependency>
+      <groupId>org.apache.poi</groupId>
+      <artifactId>poi-ooxml</artifactId>
+      <version>${poi.version}</version>
+      <!-- poi-ooxml includes poi core and xmlbeans transitively -->
+    </dependency>
+
+    <!-- ── @ConfigurationProperties binding ─────────────────────────────── -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-configuration-processor</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <!-- ── Test dependencies ─────────────────────────────────────────────── -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+      <!-- Includes JUnit 5, Mockito, AssertJ, MockMvc, Spring Test -->
+    </dependency>
+
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>${testcontainers.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>postgresql</artifactId>
+      <version>${testcontainers.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+  </dependencies>
+
+  <build>
+    <plugins>
+
+      <!-- ── Spring Boot Maven Plugin ───────────────────────────────────── -->
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <!-- Produces an executable fat JAR in target/ -->
+      </plugin>
+
+      <!-- ── JaCoCo code-coverage ───────────────────────────────────────── -->
+      <!--
+        Design: coverage is checked at the verify phase so `mvn test` is fast
+        and `mvn verify` enforces the gate. The rule applies to the whole project
+        excluding generated code (domain entities are tested indirectly).
+      -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>${jacoco.version}</version>
+        <executions>
+          <execution>
+            <id>prepare-agent</id>
+            <goals><goal>prepare-agent</goal></goals>
+          </execution>
+          <execution>
+            <id>report</id>
+            <phase>verify</phase>
+            <goals><goal>report</goal></goals>
+          </execution>
+          <execution>
+            <id>check</id>
+            <phase>verify</phase>
+            <goals><goal>check</goal></goals>
+            <configuration>
+              <rules>
+                <rule>
+                  <element>BUNDLE</element>
+                  <limits>
+                    <limit>
+                      <counter>LINE</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>0.80</minimum>  <!-- 80 % line coverage gate -->
+                    </limit>
+                  </limits>
+                  <excludes>
+                    <!-- Exclude generated/boilerplate classes -->
+                    <exclude>com/rackwatch/api/domain/**</exclude>
+                    <exclude>com/rackwatch/api/RackWatchApplication</exclude>
+                  </excludes>
+                </rule>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- ── OWASP Dependency-Check ──────────────────────────────────────── -->
+      <!--
+        Design: runs only in CI (-Dowasp.skip=false). Fails the build if any
+        dependency has a CVSS score >= 7 (High or Critical).
+        NVD API key is passed via CI secret (see ci.yml).
+      -->
+      <plugin>
+        <groupId>org.owasp</groupId>
+        <artifactId>dependency-check-maven</artifactId>
+        <version>${owasp-dc.version}</version>
+        <configuration>
+          <skip>${owasp.skip}</skip>
+          <failBuildOnCVSS>7</failBuildOnCVSS>
+          <suppressionFile>owasp-suppressions.xml</suppressionFile>
+          <nvdApiKey>${env.NVD_API_KEY}</nvdApiKey>
+        </configuration>
+        <executions>
+          <execution>
+            <goals><goal>check</goal></goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- ── Maven Compiler ─────────────────────────────────────────────── -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <!-- version managed by parent; Java 21 set via java.version property -->
+      </plugin>
+
+      <!-- ── Failsafe (integration tests) ──────────────────────────────── -->
+      <!--
+        Design: integration tests (files ending in IT.java) run in the
+        integration-test phase, after unit tests. This keeps unit tests fast
+        and integration tests (which spin up Testcontainers) separated.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>integration-test</goal>
+              <goal>verify</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+    </plugins>
+  </build>
+
+</project>

@@ -1,0 +1,1 @@
+[{"sensor_id":"ROOM-A-TEMP-01","ts":"2026-11-23T13:33:48Z","temp_c":22.0},{"sensor_id":"ROOM-A-RH-01","ts":"2026-11-23T13:33:48Z","rh_pct":49.3},{"sensor_id":"ROOM-B-TEMP-01","ts":"2026-11-23T13:33:48Z","temp_c":22.1},{"sensor_id":"ROOM-B-RH-01","ts":"2026-11-23T13:33:48Z","rh_pct":50.6}]
